@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380" fill="none">
+    <rect width="600" height="380" rx="16" fill="#1e1f22"/>
+    <rect x="12" y="12" width="576" height="356" rx="12" fill="#2b2d31" stroke="#383a40" stroke-width="2"/>
+    <circle cx="300" cy="140" r="48" fill="#5865F2" fill-opacity="0.15"/>
+    <g transform="translate(276, 116)" stroke="#5865F2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <rect x="3" y="3" width="42" height="42" rx="4" fill="#5865F2" fill-opacity="0.2"/>
+      <circle cx="15" cy="16" r="3" fill="#5865F2"/>
+      <path d="M42 32l-12-12-16 16"/>
+      <path d="M22 28l6-6 14 14"/>
+    </g>
+    <text x="300" y="228" fill="#f2f3f5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="700" text-anchor="middle">Image Attachment</text>
+    <text x="300" y="258" fill="#949ba4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="500" text-anchor="middle">Verified Media Attachment</text>
+    <rect x="230" y="280" width="140" height="28" rx="14" fill="#5865F2" fill-opacity="0.2"/>
+    <text x="300" y="299" fill="#5865F2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" text-anchor="middle">Permanent Storage</text>
+  </svg>

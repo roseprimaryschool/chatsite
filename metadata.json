@@ -1,0 +1,6 @@
+{
+  "name": "PulseChat - Real-Time Chatroom",
+  "description": "Production-grade, real-time community chatroom with WebSockets, persistent SQLite database, live reactions, image sharing, threads, voice mockups/rooms, and rich user profiles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
