@@ -157,4 +157,39 @@ export const api = {
       body: JSON.stringify({ banned }),
     });
   },
+
+  // Messages REST fallback (supports serverless / Vercel environments)
+  async postMessage(payload: { channelId?: string; recipientId?: string; content: string; imageUrl?: string; replyToId?: string }) {
+    return request<{ message: Message }>('/api/messages', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async patchMessage(messageId: string, content: string) {
+    return request<{ message: Message }>(`/api/messages/${messageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ content }),
+    });
+  },
+
+  async removeMessage(messageId: string) {
+    return request<{ success: boolean; messageId: string }>(`/api/messages/${messageId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async toggleReaction(messageId: string, emoji: string) {
+    return request<{ added: boolean }>(`/api/messages/${messageId}/reactions`, {
+      method: 'POST',
+      body: JSON.stringify({ emoji }),
+    });
+  },
+
+  async togglePin(messageId: string) {
+    return request<{ is_pinned: number; channel_id?: string }>(`/api/messages/${messageId}/pin`, {
+      method: 'POST',
+    });
+  },
 };
+

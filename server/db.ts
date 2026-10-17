@@ -5,20 +5,70 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import type { User, Channel, Message, Reaction, Report, Session } from './types.js';
 
-export const DATA_DIR = path.resolve(process.cwd(), 'data');
-export const PERSISTENT_UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+const isServerless = Boolean(
+  process.env.VERCEL ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.LAMBDA_TASK_ROOT ||
+  process.env.VERCEL_ENV
+);
+
+export const DATA_DIR = isServerless
+  ? path.join('/tmp', 'pulsechat_data')
+  : path.resolve(process.cwd(), 'data');
+
+export const PERSISTENT_UPLOADS_DIR = isServerless
+  ? path.join('/tmp', 'pulsechat_uploads')
+  : path.join(DATA_DIR, 'uploads');
+
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (e) {
+  console.warn('Notice: Failed creating DATA_DIR synchronously:', e);
 }
-if (!fs.existsSync(PERSISTENT_UPLOADS_DIR)) {
-  fs.mkdirSync(PERSISTENT_UPLOADS_DIR, { recursive: true });
+
+try {
+  if (!fs.existsSync(PERSISTENT_UPLOADS_DIR)) {
+    fs.mkdirSync(PERSISTENT_UPLOADS_DIR, { recursive: true });
+  }
+} catch (e) {
+  console.warn('Notice: Failed creating PERSISTENT_UPLOADS_DIR synchronously:', e);
 }
 
 const DB_PATH = path.join(DATA_DIR, 'pulsechat.db');
 
+// In serverless, if /tmp DB doesn't exist yet, seed from bundled data/pulsechat.db if present
+if (isServerless) {
+  try {
+    const bundledDbPath = path.resolve(process.cwd(), 'data', 'pulsechat.db');
+    if (!fs.existsSync(DB_PATH) && fs.existsSync(bundledDbPath)) {
+      fs.copyFileSync(bundledDbPath, DB_PATH);
+    }
+  } catch (e) {
+    console.warn('Notice: Could not copy bundled DB to /tmp:', e);
+  }
+}
+
+const remoteUrl = process.env.TURSO_DATABASE_URL || process.env.LIBSQL_URL || process.env.DATABASE_URL;
+const remoteToken = process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN;
+
 export const db: Client = createClient({
-  url: `file:${DB_PATH}`,
+  url: remoteUrl || `file:${DB_PATH}`,
+  authToken: remoteToken,
 });
+
+let initPromise: Promise<void> | null = null;
+export function ensureDatabaseInitialized(): Promise<void> {
+  if (!initPromise) {
+    initPromise = initDatabase().catch((err) => {
+      initPromise = null;
+      console.error('Database initialization failed:', err);
+      throw err;
+    });
+  }
+  return initPromise;
+}
 
 export async function initDatabase(): Promise<void> {
   // Execute database initialization

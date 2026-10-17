@@ -167,6 +167,38 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     };
   }, [currentChannel, currentDmUser]);
 
+  // Periodic polling fallback when WebSocket is not connected (e.g. on Vercel Serverless)
+  useEffect(() => {
+    if (isConnected || !token || !user) return;
+    if (!currentChannel && !currentDmUser) return;
+
+    const interval = setInterval(async () => {
+      try {
+        if (currentChannel) {
+          const res = await api.fetchChannelMessages(currentChannel.id, 60);
+          setMessages((prev) => {
+            if (res.messages.length === prev.length && res.messages[res.messages.length - 1]?.id === prev[prev.length - 1]?.id) {
+              return prev;
+            }
+            return res.messages;
+          });
+        } else if (currentDmUser) {
+          const res = await api.fetchDmMessages(currentDmUser.id, 60);
+          setMessages((prev) => {
+            if (res.messages.length === prev.length && res.messages[res.messages.length - 1]?.id === prev[prev.length - 1]?.id) {
+              return prev;
+            }
+            return res.messages;
+          });
+        }
+      } catch {
+        // Silent fallback
+      }
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [isConnected, token, user, currentChannel, currentDmUser]);
+
   // Create WebRTC peer connection helper
   const createPeerConnection = useCallback((remoteUserId: string, isInitiator: boolean) => {
     if (peerConnectionsRef.current.has(remoteUserId)) {
@@ -752,65 +784,104 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   };
 
   const sendMessage = async (content: string, imageUrl?: string, replyToId?: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      throw new Error('Connection lost. Please wait for reconnection.');
-    }
-
-    wsRef.current.send(
-      JSON.stringify({
-        type: 'send_message',
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'send_message',
+          channelId: currentChannel?.id,
+          recipientId: currentDmUser?.id,
+          content,
+          imageUrl,
+          replyToId,
+        })
+      );
+    } else {
+      // Fallback via REST API (e.g. on Vercel Serverless)
+      const res = await api.postMessage({
         channelId: currentChannel?.id,
         recipientId: currentDmUser?.id,
         content,
         imageUrl,
         replyToId,
-      })
-    );
+      });
+      if (res.message) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === res.message.id)) return prev;
+          return [...prev, res.message];
+        });
+      }
+    }
 
     setReplyingTo(null);
   };
 
-  const editMessage = (messageId: string, content: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(
-      JSON.stringify({
-        type: 'edit_message',
-        messageId,
-        content,
-      })
-    );
+  const editMessage = async (messageId: string, content: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'edit_message',
+          messageId,
+          content,
+        })
+      );
+    } else {
+      const res = await api.patchMessage(messageId, content);
+      if (res.message) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, content: res.message.content, is_edited: 1 } : m))
+        );
+      }
+    }
     setEditingMessage(null);
   };
 
-  const deleteMessage = (messageId: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(
-      JSON.stringify({
-        type: 'delete_message',
-        messageId,
-      })
-    );
+  const deleteMessage = async (messageId: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'delete_message',
+          messageId,
+        })
+      );
+    } else {
+      await api.removeMessage(messageId);
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    }
   };
 
-  const toggleReaction = (messageId: string, emoji: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(
-      JSON.stringify({
-        type: 'toggle_reaction',
-        messageId,
-        emoji,
-      })
-    );
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'toggle_reaction',
+          messageId,
+          emoji,
+        })
+      );
+    } else {
+      await api.toggleReaction(messageId, emoji);
+      if (currentChannel) {
+        api.fetchChannelMessages(currentChannel.id).then((res) => setMessages(res.messages));
+      } else if (currentDmUser) {
+        api.fetchDmMessages(currentDmUser.id).then((res) => setMessages(res.messages));
+      }
+    }
   };
 
-  const togglePin = (messageId: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(
-      JSON.stringify({
-        type: 'toggle_pin',
-        messageId,
-      })
-    );
+  const togglePin = async (messageId: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'toggle_pin',
+          messageId,
+        })
+      );
+    } else {
+      const res = await api.togglePin(messageId);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, is_pinned: res.is_pinned } : m))
+      );
+    }
   };
 
   const sendTyping = (isTyping: boolean) => {

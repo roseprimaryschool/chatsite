@@ -124,6 +124,7 @@ export async function deleteSession(token: string): Promise<void> {
 // Express Request augmentation
 export interface AuthenticatedRequest extends Request {
   user?: User;
+  token?: string;
 }
 
 export async function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
@@ -139,6 +140,8 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
   if (!token) {
     return next();
   }
+
+  req.token = token;
 
   try {
     const user = await getUserBySessionToken(token);
